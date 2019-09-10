@@ -1,0 +1,15 @@
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+     - "5000:5000"
+    container_name: flask_web
+  redis:
+    image: redis
+    volumes:
+      - redis-data:/data
+    container_name: redis
+volumes:
+  redis-data:
+    driver: local

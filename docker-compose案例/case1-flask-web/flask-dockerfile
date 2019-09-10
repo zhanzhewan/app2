@@ -1,0 +1,6 @@
+FROM python:3.6-alpine
+LABEL Description="本镜像用于启动建议的基于flask的web程序" Author="Itcast" Version="1.0"
+COPY ./flask-web-code /code
+WORKDIR /code
+RUN pip install -r requirements.txt
+CMD ["python", "app.py"]
