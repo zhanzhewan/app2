@@ -1,0 +1,194 @@
+代码结构:
+
+|__GetFilesFromSVN.py
+
+|__config.ini
+
+|__fileList.txt
+
+代码：
+
+ GetFilesFromSVN.py
+
+#----------------------------------------------
+# Author    : Jeff Yu
+# Date      : 2012-8-13
+# Function  : get files from SVN
+#----------------------------------------------
+
+#----------------------------------
+# Step1: Get INFO
+#----------------------------------
+import sys,ConfigParser
+
+try:
+    configFile = open("config.ini","r")
+except IOError:
+    print "config.ini is not found"
+    raw_input("")
+    sys.exit()
+
+config = ConfigParser.ConfigParser()
+config.readfp(configFile)
+configFile.close()
+
+# get baseurl
+try:
+    baseurl = config.get("INFO","baseurl")
+
+    # incase last "/" is missing in baseurl
+    baseurl = baseurl.rstrip("/")
+    baseurl = "%s/"%baseurl
+except ConfigParser.NoOptionError: 
+    print "baseurl is not found under section INFO in config.ini."
+    raw_input("")
+    sys.exit()
+        
+# get user
+try: 
+    user = config.get("INFO","user")
+except ConfigParser.NoOptionError:   
+    meg = "user is not found under section INFO in config.ini."
+    raw_input("")
+    sys.exit()
+
+# get passwd    
+try:
+    passwd = config.get("INFO","passwd")
+except ConfigParser.NoOptionError:
+    meg = "passwd is not found under section INFO in config.ini."
+    raw_input("")
+    sys.exit()
+
+# get fileList   
+try: 
+    fileList = config.get("INFO","fileList")
+except ConfigParser.NoOptionError:
+    meg = "fileList is not found under section INFO in config.ini."
+    raw_input("")
+    sys.exit()
+
+
+#----------------------------------
+# Step2: Auth
+#----------------------------------
+import urllib2
+realm = "Subversion Repositories"
+auth = urllib2.HTTPBasicAuthHandler()
+auth.add_password(realm, baseurl, user, passwd)
+opener = urllib2.build_opener(auth, urllib2.CacheFTPHandler)
+urllib2.install_opener(opener)
+
+
+#----------------------------------
+# Step3: Create Folder
+#----------------------------------
+import os
+folderName = "svnFile"
+if not os.path.exists(folderName):
+    os.mkdir(folderName)
+
+
+#----------------------------------
+# Step4: Get Files
+#----------------------------------
+fr = open(fileList,'r')
+for i in fr:
+    i = i.strip("\n")
+    i = i.strip(" ")
+    
+    # ignore the blank line
+    if i != "":
+        url = "%s%s"%(baseurl,i)
+
+        try:
+            data = urllib2.urlopen(url)
+
+            fw = open("%s/%s"%(folderName,i),'w')
+            fw.write(data.read())
+            fw.close()
+
+            print "Download: %s."%i
+
+        except urllib2.HTTPError, e:
+            # HTTPError is a subclass of URLError
+            # need to catch this exception first
+            mesg = str(e).split(" ")
+            errCode = mesg[2].rstrip(":")
+            
+            if errCode == "401":
+                # HTTP Error 401: basic auth failed
+                print "Can not login in, please check the user and passwd in config.ini."
+                break
+            elif errCode == "404":
+                # HTTP Error 404: Not Found
+                print "Not Found: %s"%i
+            else:
+                print e
+                print "Failed to download %s"%i
+
+        except urllib2.URLError:
+            # 1.SVN server is down 
+            # 2.URL is not correct
+            print "Please check SVN Server status and baseurl in config.ini."
+            break
+
+fr.close()
+raw_input("")
+
+
+
+
+config.ini
+[INFO]
+baseurl = https://xxx/xxx/xxx/xxx/
+user    = 用户名
+passwd  = 密码
+fileList= fileList.txt
+
+
+fileList.txt
+
+aaaaa.txt
+bbbbb.txt
+ccccc.txt
+
+
+
+使用方法:
+1.配置config.ini，配置好需要check out文件所在文件夹的URL(baseurl)，用户名(user)，密码(passwd)和存储文件列表的文件名称(fileList)
+
+2.将要check out的文件列表放在文本文件里面(fileList.txt)，每一个文件占一行.
+
+3.双击GetFilesFromSVN.py运行,下载的文件将放在当前文件夹下用过名为svnFile的文件夹里面.
+
+ 
+
+PS:获取realm
+
+在这个脚本中，我hardcode了一段代码(064行)  realm = "Subversion Repositories"
+
+关于这个realm，可以使用下面脚本获取：
+
+import urllib2
+import sys
+
+url = '这里写URL'
+
+username = '这里写用户名'
+password = '这里写密码'
+
+req = urllib2.Request(url)
+try:
+    handle = urllib2.urlopen(req)
+except IOError, e:
+    pass
+else:
+    print "This page isn't protected by authentication."
+    sys.exit(1)
+
+getrealm = e.headers['www-authenticate']
+print getrealm
+
+
+参考:http://bbs.chinaunix.net/thread-1238478-1-1.html
